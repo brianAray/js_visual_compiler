@@ -1,26 +1,17 @@
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
-const generate = require('@babel/generator').default;
-const { generateVariablePayload, generateObjectExpressionPayload, generateArrayExpressionPayload,
+const { generateVariablePayload, 
 generateAssignmentExpressionPayload,
-generateBinaryExpressionPayload,
 generateFunctionDeclarationPayload,
 generateUpdateExpressionPayload,
 generateCallExpressionPayload,
-generateBlockStatementPayload,
 generateClassDeclarationPayload,
-generateClassBodyPayload,
 generateClassMethodPayload} = require('./payload_generators/payload_generator.js');
-const t = require('@babel/types');
 
 const inputCode = `
-class Person {
-    constructor(name, age) {
-      this.name = name;
-      this.age = age;
-    }
-}
+let mike = {id: 1234, name: "Mike"};
 `
+
 const nextId = () => {
     let id = 0;
     return () => id++;
@@ -79,7 +70,6 @@ function handleEnterOrExit(path, isExit=false){
             addSequence({type, key, isExit, payload})
             break;
         case 'BlockStatement':
-            // payload = generateBlockStatementPayload(path.node.body);
             addSequence({type, key, isExit, payload});
             break;
         case 'UpdateExpression':
@@ -115,6 +105,4 @@ const Visitor = {
 }
 
 traverse(ast, Visitor);
-// console.log(sequence);
-sequence.forEach((step) => console.log(step))
-console.log(sequence[0].payload);
+// sequence.forEach((step) => console.log(step))

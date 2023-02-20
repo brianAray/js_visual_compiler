@@ -24,6 +24,10 @@ function generateVariablePayload(path){
             case 'CallExpression':
                 payload = generateCallExpressionPayload(path, true);
                 return {id, kind, type, value: {...payload, type}}
+            case 'NewExpression':
+                payload = generateNewExpressionPayload(path);
+                return {...payload, type};
+                break;
             default:
                 value = path.node.init.value;
                 return {id, kind, type, value};
@@ -52,9 +56,22 @@ function generateArrayExpressionPayload(elemNode){
 }
 
 function generateAssignmentExpressionPayload(path){
-    let operator = path.node.expression?.operator || path.node.operator;
-    let left = path.node.expression?.left || path.node.left;
-    let right = path.node.expression?.right || path.node.right;
+    let operator;
+    let left;
+    let right;
+    if(path.operator){
+        operator = path.operator;
+        left = path.left;
+        right = path.right; 
+    }else if(path.node.operator){
+        operator = path.node.operator;
+        left = path.node.left;
+        right = path.node.right;
+    }else{
+        operator = path.node.expression.operator;
+        left = path.node.expression.left;
+        right = path.node.expression.right;
+    }
     let properties = [];
     let elements = [];
     let payload = {operator};
@@ -143,12 +160,13 @@ function generateBlockStatementPayload(body){
     for(const bodyNode of body){
         let type = bodyNode.type;
         let payload;
+        let argumentType;
         switch(type){
             case 'ReturnStatement':
-                let argumentType = bodyNode.argument.type;
+                argumentType = bodyNode.argument.type;
                 switch(argumentType){
                     case 'BinaryExpression':
-                        let payload = generateBinaryExpressionPayload(bodyNode.argument);
+                        payload = generateBinaryExpressionPayload(bodyNode.argument);
                         return {...payload, type};
                     default:
                         break;
@@ -158,6 +176,14 @@ function generateBlockStatementPayload(body){
                 payload = generateBinaryExpressionPayload(bodyNode);
                 return {...payload, type};
             case 'ExpressionStatement':
+                argumentType = bodyNode.expression.type;
+                switch(argumentType){
+                    case 'AssignmentExpression':
+                        payload = generateAssignmentExpressionPayload(bodyNode.expression);
+                        return {...payload, type}
+                    default:
+                        break;
+                }
                 break;
             default:
                 break;
@@ -183,7 +209,12 @@ function generateCallExpressionPayload(path, isInit=false){
     let arguments = [];
     node.arguments.forEach((arg) => {
         if(arg.type === 'MemberExpression'){
-            let name = arg.object.name;
+            let name; 
+            if(arg.object.type === 'ThisExpression'){
+                name = 'this'
+            }else{
+                name = arg.object.name;
+            }
             let isComputed = arg.computed;
             let property = arg.property.name || arg.property.value;
             arguments.push({type: arg.type, name, isComputed, property});
@@ -193,7 +224,12 @@ function generateCallExpressionPayload(path, isInit=false){
     );
     switch (calleeType){
         case 'MemberExpression':
-            let name = node.callee.object.name;
+            let name;
+            if(node.callee.object.type === 'ThisExpression'){
+                name = 'this'
+            }else{
+                name = node.callee.object.name;
+            }
             let isComputed = node.callee.computed;
             let property = node.callee.property.name;
             let object = {name, isComputed, property}
@@ -214,11 +250,35 @@ function generateClassDeclarationPayload(path){
 }
 
 function generateClassBodyPayload(path){
-    console.log(path.node);
 }
 
 function generateClassMethodPayload(path){
-    console.log(path.node);
+    let id = path.node.key.name;
+    let kind = path.node.kind;
+    let isComputed = path.node.computed;
+    let isAsync = path.node.async;
+    let params = [];
+    path.node.params.forEach(param => params.push(param.name));
+    return {id, kind, isComputed, isAsync, isComputed, params};
+}
+
+function generateNewExpressionPayload(path){
+    let id = path.node.id.name;
+    let calleeType = path.node.init.callee.type;
+    let calleeName = path.node.init.callee.name;
+    let arguments = [];
+    path.node.init.arguments.forEach((arg) => {
+        if(arg.type === 'MemberExpression'){
+            let name = arg.object.name;
+            let isComputed = arg.computed;
+            let property = arg.property.name || arg.property.value;
+            arguments.push({type: arg.type, name, isComputed, property});
+        }else{
+            arguments.push({type: arg.type, value: arg.value || arg.name})}
+        }
+    )
+
+    return {id, callee: {type: calleeType, name: calleeName}, arguments}
 }
 
 module.exports = {
@@ -233,5 +293,6 @@ module.exports = {
     generateBlockStatementPayload,
     generateClassDeclarationPayload,
     generateClassBodyPayload,
-    generateClassMethodPayload
+    generateClassMethodPayload,
+    generateNewExpressionPayload
 }
